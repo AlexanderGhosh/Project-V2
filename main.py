@@ -2,13 +2,13 @@ import numpy as np
 import cv2 as cv
 import matplotlib.pyplot as graph
 
-THRESH_HOLD = 0.6
+THRESH_HOLD = 0.7
 TARG = 0.0, 1.0, 0.0
 def how_red(orig: tuple) -> float:
     b1, g1, r1 = orig / 255.0
     r2, g2, b2 = TARG
     t = (r1 - r2)**2.0 + (g1 - g2)**2.0 + (b1 - b2)**2.0
-    t = t**0.5
+    # t = t**0.5
     t /= 3.0**0.5
     return 1.0 - t
 
