@@ -1,9 +1,12 @@
 import numpy as np
 import cv2 as cv
 import matplotlib.pyplot as graph
+from sklearn.cluster import KMeans
+import time
 
 THRESH_HOLD = 0.7
-TARG = 0.0, 1.0, 0.0
+TARG = 1.0, 0.0, 0.0
+CLUSTERS = 2
 def how_red(orig: tuple) -> float:
     b1, g1, r1 = orig / 255.0
     r2, g2, b2 = TARG
@@ -13,7 +16,7 @@ def how_red(orig: tuple) -> float:
     return 1.0 - t
 
 
-im = cv.imread('./dataset/1.jpg')
+im = cv.imread('./dataset/2.jpg')
 
 mask = np.zeros(im.shape, dtype=np.uint8)
 
@@ -35,13 +38,35 @@ for x in range(im.shape[0]):
             px = 0
         mask[x, y] = [px] * 3
 
-mean_ = sum(xs_) // len(xs_), sum(ys_) // len(xs_)
-mask = cv.circle(mask, mean_, 5, (255, 125, 125), -1)
+dataset = np.asarray(list(zip(xs_, ys_)))
+kmeans = KMeans(CLUSTERS).fit(dataset)
 
-p = [(max(xs_), max(ys_)), (min(xs_), min(ys_))]
 
-print(p)
-mask = cv.rectangle(mask, p[0], p[1], (0, 255, 255))
+# mean_ = sum(xs_) // len(xs_), sum(ys_) // len(xs_)
+
+'''mean_ = np.floor(kmeans.cluster_centers_[0])
+mask = cv.circle(mask, (int(mean_[0]), int(mean_[1])), 10, (0, 0, 125), -1)
+
+mean_ = np.floor(kmeans.cluster_centers_[1])
+mask = cv.circle(mask, (int(mean_[0]), int(mean_[1])), 10, (255, 0, 0), -1)
+'''
+split_ = [[] for i in range(CLUSTERS)]
+
+for point, label in zip(zip(xs_, ys_), kmeans.labels_):
+    split_[label].append(point)
+
+for c in range(CLUSTERS):
+    centre_ = np.floor(kmeans.cluster_centers_[c])
+    mask = cv.circle(mask, (int(centre_[0]), int(centre_[1])), 10, (0, 0, 125), -1)
+    max_ = [0, 0]
+    min_ = [10000000, 100000000]
+    for point in split_[c]:
+        for i in range(2):
+            max_[i] = max(max_[i], point[i])
+            min_[i] = min(min_[i], point[i])
+
+    mask = cv.rectangle(mask, min_, max_, (0, 255, 255))
+
 
 '''#cv.imshow('image', im)
 cv.startWindowThread()
