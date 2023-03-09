@@ -7,6 +7,9 @@ import time
 THRESH_HOLD = 0.7
 TARG = 1.0, 0.0, 0.0
 CLUSTERS = 2
+MAX_ITTER = 10
+
+
 def how_red(orig: tuple) -> float:
     b1, g1, r1 = orig / 255.0
     r2, g2, b2 = TARG
@@ -20,13 +23,11 @@ im = cv.imread('./dataset/2.jpg')
 
 mask = np.zeros(im.shape, dtype=np.uint8)
 
+height_ = im.shape[0]
 
-sum_ = [0, 0]
-count_ = 0
+
 xs_ = []
 ys_ = []
-
-height_ = im.shape[0]
 for x in range(im.shape[0]):
     for y in range(im.shape[1]):
         close = how_red(im[x, y])
@@ -38,26 +39,28 @@ for x in range(im.shape[0]):
             px = 0
         mask[x, y] = [px] * 3
 
-dataset = np.asarray(list(zip(xs_, ys_)))
+points_ = list(zip(xs_, ys_))
+
+dataset = np.asarray(points_)
 kmeans = KMeans(CLUSTERS).fit(dataset)
 
+start_ = time.process_time()
+# split_ = [[] for i in range(CLUSTERS)]
 
-# mean_ = sum(xs_) // len(xs_), sum(ys_) // len(xs_)
+maxs_ = [[0, 0] for i in range(CLUSTERS)]
+mins_ = [[100000, 100000] for i in range(CLUSTERS)]
 
-'''mean_ = np.floor(kmeans.cluster_centers_[0])
-mask = cv.circle(mask, (int(mean_[0]), int(mean_[1])), 10, (0, 0, 125), -1)
+for (x, y), label in zip(points_, kmeans.labels_):
+    # split_[label].append((x, y))
+    maxs_[label][0] = max(maxs_[label][0], x)
+    maxs_[label][1] = max(maxs_[label][1], y)
 
-mean_ = np.floor(kmeans.cluster_centers_[1])
-mask = cv.circle(mask, (int(mean_[0]), int(mean_[1])), 10, (255, 0, 0), -1)
-'''
-split_ = [[] for i in range(CLUSTERS)]
+    mins_[label][0] = min(mins_[label][0], x)
+    mins_[label][1] = min(mins_[label][1], y)
 
-for point, label in zip(zip(xs_, ys_), kmeans.labels_):
-    split_[label].append(point)
-
-for c in range(CLUSTERS):
+'''for c in range(CLUSTERS):
     centre_ = np.floor(kmeans.cluster_centers_[c])
-    mask = cv.circle(mask, (int(centre_[0]), int(centre_[1])), 10, (0, 0, 125), -1)
+    # mask = cv.circle(mask, (int(centre_[0]), int(centre_[1])), 10, (0, 0, 125), -1)
     max_ = [0, 0]
     min_ = [10000000, 100000000]
     for point in split_[c]:
@@ -65,9 +68,11 @@ for c in range(CLUSTERS):
             max_[i] = max(max_[i], point[i])
             min_[i] = min(min_[i], point[i])
 
-    mask = cv.rectangle(mask, min_, max_, (0, 255, 255))
+    mask = cv.rectangle(mask, min_, max_, (0, 255, 255))'''
 
-
+elapsed_ = time.process_time() - start_
+# bounding boxes drawn
+print(f'{elapsed_} seconds elapsed')
 '''#cv.imshow('image', im)
 cv.startWindowThread()
 cv.imshow('mask', mask)
