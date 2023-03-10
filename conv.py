@@ -11,9 +11,9 @@ class Threshold(nn.Module):
         self.threshold = threshold
 
     def forward(self, x):
-        return torch.ceil(x - self.threshold - 0.001)
+        return torch.abs(torch.ceil(x - self.threshold - 0.001))
 
-
+MAX_FRAMES = 100
 TARGET_COLOUR = [1.0, 0.0, 0.0]
 
 device = None
@@ -27,14 +27,26 @@ else:
 im = cv.imread('./dataset/1.jpg')
 im = cv.cvtColor(im, cv.COLOR_BGR2RGB).astype(np.float32)
 
-n = np.sum(im, axis=2)
+video = cv.VideoCapture('./dataset/3.mp4')
+# frame count, channels, with , height
+data = np.zeros([int(t) for t in (min(MAX_FRAMES, video.get(7)), 3, video.get(3), video.get(4))])
+i = 0
+while video.isOpened() and i < MAX_FRAMES:
+    suc, frame = video.read()
+    if not suc:
+        break
+    n = np.sum(frame, axis=2)
 
-n = np.repeat(n[:,:,np.newaxis], 3, axis=2)
-im /= n
+    n = np.repeat(n[:,:,np.newaxis], 3, axis=2)
+    d = frame / n
 
-im = im.T
-im = np.asarray([im]).astype(np.float32)
+    data[i] = d.T
 
+    i += 1
+
+video.release()
+print('video loaded')
+data = data.astype(np.float32)
 
 w_ = np.asarray([TARGET_COLOUR])
 w_ = np.expand_dims(w_, axis=-1)
@@ -47,17 +59,29 @@ w_ = nn.Parameter(w_)
 conv.weight = w_
 conv.bias = nn.Parameter(torch.zeros((1,)))
 conv = conv.to(device)
+print('conv created')
 
 thresh = Threshold(0.4)
 thresh = thresh.to(device)
+print('thresh created')
 
-x = torch.from_numpy(im)
+x = torch.from_numpy(data)
 x = x.to(device)
+print('x moved to gpu')
 
 y = conv(x)
 y = thresh(y)
+print('ai run')
 
 y = y.detach().cpu().numpy()
-plot.imshow(y[0].T, cmap='gray')
-plot.show()
+fourcc = cv.VideoWriter_fourcc(*'DIVX')
+shape_ = y.shape[2:]
+print('writing')
+print(shape_)
+writer = cv.VideoWriter('002.mov', fourcc, 25.0, shape_, isColor=False)
+for d in y:
+    t = (d * 255).astype(np.uint8).T
+    writer.write(t)
+writer.release()
+print('done')
 
