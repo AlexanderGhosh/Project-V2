@@ -16,38 +16,48 @@ class Threshold(nn.Module):
 
 TARGET_COLOUR = [1.0, 0.0, 0.0]
 
+device = None
+if torch.cuda.is_available():
+    device = torch.device('cuda')
+    print('cuda')
+else:
+    device = torch.device('cpu')
+    print('cpu')
 
 im = cv.imread('./dataset/1.jpg')
-im = cv.cvtColor(im, cv.COLOR_BGR2RGB)
+im = cv.cvtColor(im, cv.COLOR_BGR2RGB).astype(np.float32)
 
-im = (im.T / 255.0).astype(np.float32)
-im = np.asarray([im])
+n = np.sum(im, axis=2)
 
-conv = nn.Conv2d(3, 1, 1)
+n = np.repeat(n[:,:,np.newaxis], 3, axis=2)
+im /= n
+
+im = im.T
+im = np.asarray([im]).astype(np.float32)
+
 
 w_ = np.asarray([TARGET_COLOUR])
 w_ = np.expand_dims(w_, axis=-1)
 w_ = np.expand_dims(w_, axis=-1)
-w_ /= np.sum(TARGET_COLOUR)
 
 w_ = torch.asarray(w_.astype(np.float32))
 
+conv = nn.Conv2d(3, 1, 1)
 w_ = nn.Parameter(w_)
 conv.weight = w_
 conv.bias = nn.Parameter(torch.zeros((1,)))
+conv = conv.to(device)
 
-thesh = Threshold(0.4)
+thresh = Threshold(0.4)
+thresh = thresh.to(device)
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 x = torch.from_numpy(im)
-#x.to(device)
-#conv.to(device)
+x = x.to(device)
 
 y = conv(x)
-y = thesh(y)
-#y.to('cpu')
-y = y.detach().numpy()
+y = thresh(y)
 
+y = y.detach().cpu().numpy()
 plot.imshow(y[0].T, cmap='gray')
 plot.show()
 
