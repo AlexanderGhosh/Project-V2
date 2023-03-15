@@ -1,11 +1,31 @@
 import matplotlib.pyplot as plot
 import torch
+import torchvision.io
 from torch.utils.data import Dataset, DataLoader
-from torchvision.io import read_video, write_video, read_video_timestamps
+from torchvision.io import read_video, write_video, read_video_timestamps, read_image, ImageReadMode
 from torch import nn
 import numpy as np
 import cv2 as cv
 from Timer import Timer
+import os
+
+
+class VideoDataset2(Dataset):
+    def __init__(self, path):
+        self.path = path
+        self.len = 0
+        self.shape = (0, 0, 0)
+        if os.path.isdir(path):
+            self.len = len(os.listdir(path))
+            img = read_image(f'{self.path}/00001.jpg')
+            self.shape = self.len, *img.shape
+
+    def __len__(self):
+        return self.len
+
+    def __getitem__(self, item):
+        file = f'{self.path}/{item + 1:05d}.jpg'
+        return read_image(file), item
 
 
 class VideoDataset(Dataset):
@@ -40,8 +60,8 @@ class ToColour(nn.Module):
         super().__init__()
 
     def forward(self, x):
-        x_ = torch.swapaxes(x, 1, -1) * 255.0
-        x_ = x_.repeat(1, 1, 1, 3)
+        x_ = x * 255.0
+        x_ = x_.repeat(1, 3, 1, 1)[0]
         return x_
 
 
@@ -116,7 +136,7 @@ with Timer('Model creation'):
 
 
 with Timer('Run model'):
-    d_ = VideoDataset('./dataset/3.mp4', MAX_FRAMES)
+    d_ = VideoDataset2('../dataset/videos/class0/001')
     video_loader = DataLoader(d_, batch_size=1, shuffle=False)
     result = torch.ones(d_.shape)
     i = 0
@@ -124,11 +144,13 @@ with Timer('Run model'):
         x = d.to(device)
         y = model(x)
         y = y.detach().cpu()
-        result[i] = torch.transpose(y, 1, 2)
+        result[i] = y
         i += 1
 
 
 with Timer('Save data'):
+    result = torch.transpose(result, 1, -1)
+    result = torch.transpose(result, 1, 2)
     write_video('002.mov', result, 25)
     '''shape_ = y.shape[2:]
     fourcc = cv.VideoWriter_fourcc(*'DIVX')

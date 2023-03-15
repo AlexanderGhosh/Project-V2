@@ -18,7 +18,7 @@ def how_red(orig: tuple) -> float:
     t /= 3.0**0.5
     return 1.0 - t
 
-video = cv.VideoCapture('./dataset/3.mp4')
+video = cv.VideoCapture('../dataset/3.mp4')
 # im = cv.imread('./dataset/2.jpg')
 
 mask = np.zeros((325, int(video.get(cv.CAP_PROP_FRAME_HEIGHT)), int(video.get(cv.CAP_PROP_FRAME_WIDTH)), 3), dtype=np.uint8)
