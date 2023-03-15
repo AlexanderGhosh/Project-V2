@@ -9,6 +9,8 @@ import cv2 as cv
 from Timer import Timer
 import os
 
+INV_COLOUR = 255.0 ** -1.0
+
 
 class VideoDataset2(Dataset):
     def __init__(self, path):
@@ -58,11 +60,31 @@ class Threshold(nn.Module):
 class ToColour(nn.Module):
     def __init__(self):
         super().__init__()
+        self.activation = nn.ReLU()
 
     def forward(self, x):
-        x_ = x * 255.0
-        x_ = x_.repeat(1, 3, 1, 1)[0]
-        return x_
+        # x = self.activation(x[:, 0, :, :] + x[:, 1, :, :])
+        x = x[:, 0, :, :]
+        x = x * 255.0
+        x = x.repeat(1, 3, 1, 1)[0]
+        return x
+
+
+class Similar(nn.Module):
+    def __init__(self, target):
+        super().__init__()
+        self.target = target
+
+    def forward(self, x):
+        return torch.abs(1.0 - (self.target - x))
+
+
+def norm(x):
+    i = x[0] + 256.0 * (x[1] + x[2] * 256.0)
+    i *= INV_COLOUR
+    i *= INV_COLOUR
+    i *= INV_COLOUR
+    return i
 
 
 class Normalize(nn.Module):
@@ -70,15 +92,21 @@ class Normalize(nn.Module):
         super().__init__()
 
     def forward(self, x):
-        n = torch.sum(x, dim=1)[:, None, :, :]
-        t = torch.div(x, n)
+        i = x[:, 0, :, :] + 256.0 * (x[:, 1, :, :] + x[:, 2, :, :] * 256.0)
+        i *= INV_COLOUR
+        i *= INV_COLOUR
+        i *= INV_COLOUR
+        i = i[:, None, :, :]
+        # n = torch.sum(x, dim=1)[:, None, :, :]
+        t = torch.pow(x, 0)
+        t = torch.mul(t, i)[:, 0, :, :][:, None, :, :]
         return t
 
 
 timer = Timer('Main Timer')
 timer.start()
 MAX_FRAMES = 100
-TARGET_COLOUR = [0.0, 0.0, 1.0]
+TARGET_COLOUR = [0, 0, 255]
 
 device = None
 if torch.cuda.is_available():
@@ -117,7 +145,7 @@ else:
     x = data.to(device)
 '''
 with Timer('Convolution weight creation'):
-    w_ = np.asarray([TARGET_COLOUR])
+    w_ = np.asarray([TARGET_COLOUR, [1, 1, 0]])
     w_ = np.expand_dims(w_, axis=-1)
     w_ = np.expand_dims(w_, axis=-1)
 
@@ -125,15 +153,14 @@ with Timer('Convolution weight creation'):
     w_ = nn.Parameter(w_)
 
 with Timer('Model creation'):
-    conv = nn.Conv2d(3, 1, 1)
+    conv = nn.Conv2d(3, 2, 1)
     conv.weight = w_
-    conv.bias = nn.Parameter(torch.zeros((1,)))
+    conv.bias = nn.Parameter(torch.zeros(conv.bias.shape))
 
     thresh = Threshold(0.4)
 
-    model = nn.Sequential(Normalize(), conv, thresh, ToColour())
+    model = nn.Sequential(Normalize(), Similar(norm(TARGET_COLOUR)), thresh, ToColour())
     model.to(device)
-
 
 with Timer('Run model'):
     d_ = VideoDataset2('../dataset/videos/class0/001')
@@ -146,7 +173,6 @@ with Timer('Run model'):
         y = y.detach().cpu()
         result[i] = y
         i += 1
-
 
 with Timer('Save data'):
     result = torch.transpose(result, 1, -1)
